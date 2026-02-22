@@ -52,7 +52,7 @@ export function initToday() {
 export function render() {
   const today     = todayStr();
   const dow       = dayOfWeek(today);
-  const scheduled = getSchedules().filter(s => s.days.includes(dow));
+  const scheduled = getSchedules().filter(s => s.days.includes(dow)).sort((a, b) => a.time - b.time);
   const history   = getHistory()[today] || {};
   const adhoc     = getAdhocForDate(today);
 
