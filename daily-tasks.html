@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DayFlow — Daily Task Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0c0c0f;
+    --surface: #14141a;
+    --surface2: #1c1c26;
+    --surface3: #242432;
+    --accent: #7c6af7;
+    --accent2: #f7c26a;
+    --accent3: #6af7c2;
+    --danger: #f76a6a;
+    --text: #e8e8f0;
+    --text2: #9090a8;
+    --text3: #55556a;
+    --border: #2a2a38;
+    --radius: 12px;
+    --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Noise overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.4;
+  }
+
+  /* Glow */
+  body::after {
+    content: '';
+    position: fixed;
+    top: -30%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 600px;
+    height: 400px;
+    background: radial-gradient(ellipse, rgba(124,106,247,0.12) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 24px 20px; }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+  }
+
+  .logo {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .logo span { font-family: 'DM Mono', monospace; font-weight: 300; font-size: 13px; color: var(--text2); display: block; -webkit-text-fill-color: var(--text2); }
+
+  .header-date {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--text2);
+    text-align: right;
+  }
+
+  .header-date .day { font-size: 22px; font-weight: 700; font-family: 'Syne', sans-serif; color: var(--text); }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 28px;
+    border: 1px solid var(--border);
+    width: fit-content;
+  }
+
+  .tab {
+    padding: 8px 20px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: var(--text2);
+    transition: var(--transition);
+    letter-spacing: 0.3px;
+  }
+
+  .tab.active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .tab:hover:not(.active) { color: var(--text); background: var(--surface2); }
+
+  /* Panels */
+  .panel { display: none; animation: fadeIn 0.3s ease; }
+  .panel.active { display: block; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Today Panel Layout */
+  .today-layout { display: grid; grid-template-columns: 1fr 340px; gap: 20px; }
+
+  @media (max-width: 768px) {
+    .today-layout { grid-template-columns: 1fr; }
+  }
+
+  /* Card */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+
+  .card-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 16px;
+  }
+
+  /* Task Item */
+  .task-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    transition: var(--transition);
+    margin-bottom: 6px;
+    cursor: pointer;
+    position: relative;
+  }
+
+  .task-item:hover { background: var(--surface2); border-color: var(--border); }
+
+  .task-item.completed { opacity: 0.5; }
+
+  .task-check {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: var(--transition);
+    background: transparent;
+  }
+
+  .task-item.completed .task-check {
+    background: var(--accent3);
+    border-color: var(--accent3);
+  }
+
+  .task-check svg { display: none; }
+  .task-item.completed .task-check svg { display: block; }
+
+  .task-info { flex: 1; min-width: 0; }
+  .task-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .task-item.completed .task-name { text-decoration: line-through; }
+
+  .task-meta {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 2px;
+  }
+
+  .task-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    flex-shrink: 0;
+  }
+
+  .badge-scheduled { background: rgba(124,106,247,0.15); color: var(--accent); }
+  .badge-adhoc { background: rgba(247,194,106,0.15); color: var(--accent2); }
+
+  .task-delete {
+    opacity: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: var(--transition);
+    color: var(--text3);
+    background: transparent;
+    border: none;
+    flex-shrink: 0;
+  }
+
+  .task-item:hover .task-delete { opacity: 1; }
+  .task-delete:hover { background: rgba(247,106,106,0.15); color: var(--danger); }
+
+  /* Empty state */
+  .empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text3);
+    font-size: 13px;
+  }
+
+  .empty .icon { font-size: 32px; margin-bottom: 8px; }
+
+  /* Add task form */
+  .add-form {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  input[type="text"], input[type="time"], input[type="date"], select, textarea {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    padding: 10px 14px;
+    outline: none;
+    transition: var(--transition);
+    width: 100%;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--accent);
+    background: var(--surface3);
+  }
+
+  input::placeholder { color: var(--text3); }
+
+  button.btn {
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: var(--transition);
+    white-space: nowrap;
+  }
+
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #9080ff; transform: translateY(-1px); }
+  .btn-secondary { background: var(--surface3); color: var(--text2); }
+  .btn-secondary:hover { background: var(--border); color: var(--text); }
+  .btn-danger { background: rgba(247,106,106,0.15); color: var(--danger); }
+  .btn-danger:hover { background: rgba(247,106,106,0.3); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+  /* Progress */
+  .progress-bar {
+    height: 4px;
+    background: var(--surface3);
+    border-radius: 2px;
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+    border-radius: 2px;
+    transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text3);
+    margin-bottom: 8px;
+  }
+
+  /* Schedule Panel */
+  .schedule-grid { display: flex; flex-direction: column; gap: 10px; }
+
+  .schedule-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .schedule-days {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .day-chip {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text3);
+  }
+
+  .day-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* Form modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: var(--transition);
+  }
+
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    width: 100%;
+    max-width: 460px;
+    transform: translateY(20px) scale(0.97);
+    transition: var(--transition);
+  }
+
+  .modal-overlay.open .modal { transform: translateY(0) scale(1); }
+
+  .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 20px; }
+
+  .form-group { margin-bottom: 14px; }
+  .form-label { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--text3); margin-bottom: 6px; display: block; }
+
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .modal-actions { display: flex; gap: 8px; margin-top: 20px; justify-content: flex-end; }
+
+  /* Analytics */
+  .analytics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 24px; }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    text-align: center;
+  }
+
+  .stat-number { font-size: 36px; font-weight: 800; letter-spacing: -2px; }
+  .stat-label { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; margin-top: 4px; }
+
+  .week-chart { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+
+  .week-day-col { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+
+  .week-day-label { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text3); }
+
+  .week-bar-wrap {
+    height: 120px;
+    display: flex;
+    align-items: flex-end;
+    width: 100%;
+  }
+
+  .week-bar {
+    width: 100%;
+    border-radius: 4px 4px 0 0;
+    background: linear-gradient(180deg, var(--accent), rgba(124,106,247,0.3));
+    transition: height 0.6s cubic-bezier(0.4,0,0.2,1);
+    min-height: 4px;
+    position: relative;
+    cursor: pointer;
+  }
+
+  .week-bar:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: 110%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    white-space: nowrap;
+    color: var(--text);
+  }
+
+  .week-pct { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text2); }
+
+  .section-title { font-size: 14px; font-weight: 700; margin-bottom: 14px; color: var(--text2); }
+
+  /* Sidebar */
+  .sidebar-section { margin-bottom: 20px; }
+
+  /* Streak */
+  .streak-display {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px;
+    background: rgba(247,194,106,0.08);
+    border: 1px solid rgba(247,194,106,0.2);
+    border-radius: 10px;
+    margin-bottom: 20px;
+  }
+
+  .streak-icon { font-size: 28px; }
+  .streak-num { font-size: 28px; font-weight: 800; color: var(--accent2); }
+  .streak-text { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <div class="logo">DayFlow</div>
+      <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text3);margin-top:2px;">daily task tracker</div>
+    </div>
+    <div class="header-date">
+      <div class="day" id="header-day"></div>
+      <div id="header-date-str"></div>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('today')">Today</button>
+    <button class="tab" onclick="switchTab('schedule')">Schedules</button>
+    <button class="tab" onclick="switchTab('analytics')">Analytics</button>
+  </div>
+
+  <!-- TODAY PANEL -->
+  <div class="panel active" id="panel-today">
+    <div class="today-layout">
+      <div>
+        <!-- Adhoc add -->
+        <div class="add-form">
+          <input type="text" id="adhoc-input" placeholder="Add an ad-hoc task for today..." onkeydown="if(event.key==='Enter')addAdhoc()">
+          <button class="btn btn-primary" onclick="addAdhoc()">+ Add</button>
+        </div>
+
+        <!-- Progress -->
+        <div class="progress-label">
+          <span id="progress-text">0 / 0 completed</span>
+          <span id="progress-pct">0%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+
+        <!-- Scheduled tasks for today -->
+        <div class="card-title">Scheduled for today</div>
+        <div id="scheduled-today"></div>
+
+        <div class="card-title" style="margin-top:20px">Ad-hoc tasks</div>
+        <div id="adhoc-today"></div>
+      </div>
+
+      <!-- Sidebar -->
+      <div>
+        <div class="streak-display">
+          <div class="streak-icon">🔥</div>
+          <div>
+            <div class="streak-num" id="streak-count">0</div>
+            <div class="streak-text">day streak</div>
+          </div>
+        </div>
+
+        <div class="card sidebar-section">
+          <div class="card-title">This week</div>
+          <div class="week-chart" id="mini-week-chart"></div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <div class="card-title">Quick stats</div>
+          <div style="display:flex;flex-direction:column;gap:10px" id="quick-stats"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCHEDULE PANEL -->
+  <div class="panel" id="panel-schedule">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div style="font-size:20px;font-weight:700">Recurring Schedules</div>
+      <button class="btn btn-primary" onclick="openScheduleModal()">+ New Schedule</button>
+    </div>
+    <div id="schedules-list"></div>
+  </div>
+
+  <!-- ANALYTICS PANEL -->
+  <div class="panel" id="panel-analytics">
+    <div style="font-size:20px;font-weight:700;margin-bottom:20px">Weekly Analytics</div>
+    <div class="analytics-grid" id="analytics-stats"></div>
+    <div class="card" style="margin-bottom:20px">
+      <div class="section-title">Completion rate — last 7 days</div>
+      <div class="week-chart" id="analytics-chart"></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Task breakdown</div>
+      <div id="task-breakdown"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Schedule Modal -->
+<div class="modal-overlay" id="schedule-modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">New Schedule</div>
+    <div class="form-group">
+      <label class="form-label">Task Name</label>
+      <input type="text" id="sched-name" placeholder="e.g. Morning workout">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Category</label>
+      <select id="sched-category">
+        <option value="work">Work</option>
+        <option value="health">Health</option>
+        <option value="personal">Personal</option>
+        <option value="learning">Learning</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Time</label>
+        <input type="time" id="sched-time">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Duration (min)</label>
+        <input type="text" id="sched-duration" placeholder="30">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Repeat on</label>
+      <div class="schedule-days" id="day-picker">
+        <div class="day-chip" data-day="0">S</div>
+        <div class="day-chip" data-day="1">M</div>
+        <div class="day-chip" data-day="2">T</div>
+        <div class="day-chip" data-day="3">W</div>
+        <div class="day-chip" data-day="4">T</div>
+        <div class="day-chip" data-day="5">F</div>
+        <div class="day-chip" data-day="6">S</div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notes (optional)</label>
+      <textarea id="sched-notes" rows="2" placeholder="Any details..." style="resize:none;width:100%"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeScheduleModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSchedule()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── DATA LAYER (localStorage) ────────────────────────────────────────────────
+const KEYS = { schedules: 'df_schedules', history: 'df_history', adhoc: 'df_adhoc' };
+
+function load(key) {
+  try { return JSON.parse(localStorage.getItem(key)) || null; } catch { return null; }
+}
+function save(key, val) {
+  localStorage.setItem(key, JSON.stringify(val));
+}
+
+function getSchedules() { return load(KEYS.schedules) || []; }
+function saveSchedules(d) { save(KEYS.schedules, d); }
+
+function getHistory() { return load(KEYS.history) || {}; }
+function saveHistory(d) { save(KEYS.history, d); }
+
+// Adhoc: { [dateStr]: [{id, name, done}] }
+function getAdhoc() { return load(KEYS.adhoc) || {}; }
+function saveAdhoc(d) { save(KEYS.adhoc, d); }
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function todayStr() {
+  const d = new Date();
+  return d.toISOString().split('T')[0];
+}
+
+function dateStr(d) { return d.toISOString().split('T')[0]; }
+
+function uid() { return Math.random().toString(36).slice(2,9); }
+
+function dayOfWeek(dateStr) { return new Date(dateStr + 'T12:00:00').getDay(); }
+
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const DAY_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const CAT_EMOJI = { work:'💼', health:'🏃', personal:'🌿', learning:'📚', other:'✨' };
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+const now = new Date();
+document.getElementById('header-day').textContent = DAY_FULL[now.getDay()];
+document.getElementById('header-date-str').textContent = now.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+
+let editingScheduleId = null;
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    const names=['today','schedule','analytics'];
+    t.classList.toggle('active', names[i]===name);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  if(name==='today') renderToday();
+  if(name==='schedule') renderSchedules();
+  if(name==='analytics') renderAnalytics();
+}
+
+// ─── TODAY ────────────────────────────────────────────────────────────────────
+function getScheduledTasks() {
+  const schedules = getSchedules();
+  const dow = new Date().getDay();
+  return schedules.filter(s => s.days.includes(dow));
+}
+
+function renderToday() {
+  const today = todayStr();
+  const history = getHistory();
+  const todayH = history[today] || {};
+  const adhocData = getAdhoc();
+  const todayAdhoc = adhocData[today] || [];
+  const scheduled = getScheduledTasks();
+
+  // Scheduled tasks
+  const schedEl = document.getElementById('scheduled-today');
+  if(scheduled.length === 0) {
+    schedEl.innerHTML = `<div class="empty"><div class="icon">📅</div>No scheduled tasks today</div>`;
+  } else {
+    schedEl.innerHTML = scheduled.map(s => {
+      const done = !!(todayH[s.id]);
+      return `<div class="task-item ${done?'completed':''}" onclick="toggleScheduled('${s.id}')">
+        <div class="task-check">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M2 6l3 3 5-5" stroke="#0c0c0f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="task-info">
+          <div class="task-name">${CAT_EMOJI[s.category]||'✨'} ${escHtml(s.name)}</div>
+          <div class="task-meta">${s.time?s.time+' · ':''} ${s.duration?s.duration+' min':'recurring'}</div>
+        </div>
+        <span class="task-badge badge-scheduled">scheduled</span>
+      </div>`;
+    }).join('');
+  }
+
+  // Adhoc
+  const adhocEl = document.getElementById('adhoc-today');
+  if(todayAdhoc.length === 0) {
+    adhocEl.innerHTML = `<div class="empty"><div class="icon">➕</div>No ad-hoc tasks yet. Add one above!</div>`;
+  } else {
+    adhocEl.innerHTML = todayAdhoc.map(t => `
+      <div class="task-item ${t.done?'completed':''}" onclick="toggleAdhoc('${t.id}')">
+        <div class="task-check">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M2 6l3 3 5-5" stroke="#0c0c0f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="task-info">
+          <div class="task-name">${escHtml(t.name)}</div>
+          <div class="task-meta">added today</div>
+        </div>
+        <span class="task-badge badge-adhoc">ad-hoc</span>
+        <button class="task-delete" onclick="deleteAdhoc(event,'${t.id}')">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    `).join('');
+  }
+
+  updateProgress(scheduled, todayH, todayAdhoc);
+  renderMiniChart();
+  renderSidebarStats();
+}
+
+function updateProgress(scheduled, todayH, todayAdhoc) {
+  const total = scheduled.length + todayAdhoc.length;
+  const done = scheduled.filter(s=>todayH[s.id]).length + todayAdhoc.filter(t=>t.done).length;
+  const pct = total === 0 ? 0 : Math.round(done/total*100);
+  document.getElementById('progress-text').textContent = `${done} / ${total} completed`;
+  document.getElementById('progress-pct').textContent = pct+'%';
+  document.getElementById('progress-fill').style.width = pct+'%';
+}
+
+function toggleScheduled(id) {
+  const today = todayStr();
+  const history = getHistory();
+  if(!history[today]) history[today] = {};
+  history[today][id] = !history[today][id];
+  saveHistory(history);
+  renderToday();
+}
+
+function toggleAdhoc(id) {
+  const today = todayStr();
+  const adhoc = getAdhoc();
+  if(!adhoc[today]) adhoc[today] = [];
+  const t = adhoc[today].find(x=>x.id===id);
+  if(t) t.done = !t.done;
+  saveAdhoc(adhoc);
+  renderToday();
+}
+
+function deleteAdhoc(e, id) {
+  e.stopPropagation();
+  const today = todayStr();
+  const adhoc = getAdhoc();
+  if(!adhoc[today]) return;
+  adhoc[today] = adhoc[today].filter(x=>x.id!==id);
+  saveAdhoc(adhoc);
+  renderToday();
+}
+
+function addAdhoc() {
+  const input = document.getElementById('adhoc-input');
+  const name = input.value.trim();
+  if(!name) return;
+  const today = todayStr();
+  const adhoc = getAdhoc();
+  if(!adhoc[today]) adhoc[today] = [];
+  adhoc[today].push({id: uid(), name, done: false});
+  saveAdhoc(adhoc);
+  input.value = '';
+  renderToday();
+}
+
+// ─── MINI CHART (sidebar) ────────────────────────────────────────────────────
+function renderMiniChart() {
+  const history = getHistory();
+  const schedules = getSchedules();
+  const adhoc = getAdhoc();
+  const el = document.getElementById('mini-week-chart');
+  const days = [];
+  for(let i=6;i>=0;i--) {
+    const d = new Date(); d.setDate(d.getDate()-i);
+    days.push(dateStr(d));
+  }
+  el.innerHTML = days.map(ds=>{
+    const dow = dayOfWeek(ds);
+    const sched = schedules.filter(s=>s.days.includes(dow));
+    const todayH = history[ds]||{};
+    const todayA = (adhoc[ds]||[]);
+    const total = sched.length + todayA.length;
+    const done = sched.filter(s=>todayH[s.id]).length + todayA.filter(t=>t.done).length;
+    const pct = total===0 ? 0 : Math.round(done/total*100);
+    const isToday = ds===todayStr();
+    return `<div class="week-day-col">
+      <div class="week-bar-wrap">
+        <div class="week-bar" data-tip="${pct}%" style="height:${Math.max(4,pct)}%;background:${isToday?'linear-gradient(180deg, var(--accent3), rgba(106,247,194,0.3))':'linear-gradient(180deg, var(--accent), rgba(124,106,247,0.3))'}"></div>
+      </div>
+      <div class="week-day-label">${DAY_NAMES[dow]}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderSidebarStats() {
+  const history = getHistory();
+  const adhoc = getAdhoc();
+  const schedules = getSchedules();
+  const el = document.getElementById('quick-stats');
+  
+  // Calculate streak
+  let streak = 0;
+  for(let i=0;;i++) {
+    const d = new Date(); d.setDate(d.getDate()-i);
+    const ds = dateStr(d);
+    const dow = dayOfWeek(ds);
+    const sched = schedules.filter(s=>s.days.includes(dow));
+    const todayH = history[ds]||{};
+    const todayA = (adhoc[ds]||[]);
+    const total = sched.length + todayA.length;
+    if(total===0) { if(i>0) break; else continue; }
+    const done = sched.filter(s=>todayH[s.id]).length + todayA.filter(t=>t.done).length;
+    if(done===total) streak++;
+    else break;
+  }
+  document.getElementById('streak-count').textContent = streak;
+
+  const totalSchedules = schedules.length;
+  const today = todayStr();
+  const todayAdhoc = (adhoc[today]||[]).length;
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;font-size:13px">
+      <span style="color:var(--text3)">Active schedules</span>
+      <span style="font-family:'DM Mono',monospace;font-weight:500;color:var(--accent)">${totalSchedules}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:13px">
+      <span style="color:var(--text3)">Ad-hoc today</span>
+      <span style="font-family:'DM Mono',monospace;font-weight:500;color:var(--accent2)">${todayAdhoc}</span>
+    </div>
+  `;
+}
+
+// ─── SCHEDULES ────────────────────────────────────────────────────────────────
+function renderSchedules() {
+  const schedules = getSchedules();
+  const el = document.getElementById('schedules-list');
+  if(schedules.length===0) {
+    el.innerHTML = `<div class="empty" style="padding:60px"><div class="icon">📋</div><p>No schedules yet. Create recurring tasks!</p></div>`;
+    return;
+  }
+  el.innerHTML = schedules.map(s => {
+    const dayChips = [0,1,2,3,4,5,6].map(d => 
+      `<div class="day-chip ${s.days.includes(d)?'active':''}" style="cursor:default">${'SMTWTFS'[d]}</div>`
+    ).join('');
+    return `<div class="schedule-item">
+      <div style="font-size:20px">${CAT_EMOJI[s.category]||'✨'}</div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:600">${escHtml(s.name)}</div>
+        <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:3px">${s.time?s.time:''} ${s.duration?'· '+s.duration+' min':''} ${s.category?'· '+s.category:''}</div>
+        <div class="schedule-days" style="margin-top:8px">${dayChips}</div>
+        ${s.notes?`<div style="font-size:12px;color:var(--text3);margin-top:6px">${escHtml(s.notes)}</div>`:''}
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-secondary btn-sm" onclick="editSchedule('${s.id}')">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteSchedule('${s.id}')">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function deleteSchedule(id) {
+  let schedules = getSchedules();
+  schedules = schedules.filter(s=>s.id!==id);
+  saveSchedules(schedules);
+  renderSchedules();
+}
+
+function editSchedule(id) {
+  const s = getSchedules().find(x=>x.id===id);
+  if(!s) return;
+  editingScheduleId = id;
+  document.getElementById('modal-title').textContent = 'Edit Schedule';
+  document.getElementById('sched-name').value = s.name;
+  document.getElementById('sched-category').value = s.category;
+  document.getElementById('sched-time').value = s.time||'';
+  document.getElementById('sched-duration').value = s.duration||'';
+  document.getElementById('sched-notes').value = s.notes||'';
+  document.querySelectorAll('#day-picker .day-chip').forEach(c => {
+    c.classList.toggle('active', s.days.includes(+c.dataset.day));
+  });
+  document.getElementById('schedule-modal').classList.add('open');
+}
+
+// ─── SCHEDULE MODAL ───────────────────────────────────────────────────────────
+document.querySelectorAll('#day-picker .day-chip').forEach(c => {
+  c.addEventListener('click', () => c.classList.toggle('active'));
+});
+
+function openScheduleModal() {
+  editingScheduleId = null;
+  document.getElementById('modal-title').textContent = 'New Schedule';
+  document.getElementById('sched-name').value='';
+  document.getElementById('sched-category').value='work';
+  document.getElementById('sched-time').value='';
+  document.getElementById('sched-duration').value='';
+  document.getElementById('sched-notes').value='';
+  document.querySelectorAll('#day-picker .day-chip').forEach(c=>c.classList.remove('active'));
+  document.getElementById('schedule-modal').classList.add('open');
+}
+
+function closeScheduleModal() {
+  document.getElementById('schedule-modal').classList.remove('open');
+}
+
+document.getElementById('schedule-modal').addEventListener('click', function(e){
+  if(e.target===this) closeScheduleModal();
+});
+
+function saveSchedule() {
+  const name = document.getElementById('sched-name').value.trim();
+  if(!name) { alert('Please enter a task name'); return; }
+  const days = [...document.querySelectorAll('#day-picker .day-chip.active')].map(c=>+c.dataset.day);
+  if(days.length===0) { alert('Please select at least one day'); return; }
+
+  const sched = {
+    id: editingScheduleId || uid(),
+    name,
+    category: document.getElementById('sched-category').value,
+    time: document.getElementById('sched-time').value,
+    duration: document.getElementById('sched-duration').value,
+    notes: document.getElementById('sched-notes').value.trim(),
+    days,
+    createdAt: new Date().toISOString()
+  };
+
+  let schedules = getSchedules();
+  if(editingScheduleId) {
+    schedules = schedules.map(s => s.id===editingScheduleId ? sched : s);
+  } else {
+    schedules.push(sched);
+  }
+  saveSchedules(schedules);
+  closeScheduleModal();
+  renderSchedules();
+}
+
+// ─── ANALYTICS ────────────────────────────────────────────────────────────────
+function renderAnalytics() {
+  const history = getHistory();
+  const adhoc = getAdhoc();
+  const schedules = getSchedules();
+  
+  const days = [];
+  for(let i=6;i>=0;i--) {
+    const d = new Date(); d.setDate(d.getDate()-i);
+    days.push(dateStr(d));
+  }
+
+  let totalCompleted=0, totalTasks=0, perfectDays=0;
+  const dayData = days.map(ds => {
+    const dow = dayOfWeek(ds);
+    const sched = schedules.filter(s=>s.days.includes(dow));
+    const todayH = history[ds]||{};
+    const todayA = (adhoc[ds]||[]);
+    const total = sched.length + todayA.length;
+    const done = sched.filter(s=>todayH[s.id]).length + todayA.filter(t=>t.done).length;
+    totalCompleted+=done; totalTasks+=total;
+    if(total>0 && done===total) perfectDays++;
+    return {ds, dow, done, total, pct: total===0?0:Math.round(done/total*100)};
+  });
+
+  const avgRate = totalTasks===0?0:Math.round(totalCompleted/totalTasks*100);
+
+  // Stats
+  document.getElementById('analytics-stats').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-number" style="color:var(--accent)">${avgRate}%</div>
+      <div class="stat-label">avg completion</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number" style="color:var(--accent3)">${totalCompleted}</div>
+      <div class="stat-label">tasks done</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number" style="color:var(--accent2)">${perfectDays}</div>
+      <div class="stat-label">perfect days</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number" style="color:var(--text2)">${schedules.length}</div>
+      <div class="stat-label">active schedules</div>
+    </div>
+  `;
+
+  // Chart
+  const chartEl = document.getElementById('analytics-chart');
+  chartEl.innerHTML = dayData.map(dd => {
+    const isToday = dd.ds===todayStr();
+    return `<div class="week-day-col">
+      <div class="week-bar-wrap">
+        <div class="week-bar" data-tip="${dd.done}/${dd.total} (${dd.pct}%)" style="height:${Math.max(4,dd.pct)}%;background:${isToday?'linear-gradient(180deg,var(--accent3),rgba(106,247,194,0.2))':''}"></div>
+      </div>
+      <div class="week-pct">${dd.pct}%</div>
+      <div class="week-day-label">${DAY_NAMES[dd.dow]}</div>
+    </div>`;
+  }).join('');
+
+  // Task breakdown by category
+  const breakdown = document.getElementById('task-breakdown');
+  const catCounts = {};
+  schedules.forEach(s=>{
+    if(!catCounts[s.category]) catCounts[s.category]={total:0,done:0};
+    catCounts[s.category].total++;
+    // count completions this week
+    days.forEach(ds=>{
+      const dow=dayOfWeek(ds);
+      if(s.days.includes(dow)){
+        const h=history[ds]||{};
+        if(h[s.id]) catCounts[s.category].done++;
+      }
+    });
+  });
+
+  const cats = Object.entries(catCounts);
+  if(cats.length===0){
+    breakdown.innerHTML=`<div class="empty">No scheduled tasks to analyze yet</div>`;
+  } else {
+    breakdown.innerHTML = cats.map(([cat,[{total,done}=[]]]) => {
+      const entry=catCounts[cat];
+      const maxPossible=entry.total*7;
+      const pct=maxPossible===0?0:Math.round(entry.done/maxPossible*100);
+      return `<div style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+          <span>${CAT_EMOJI[cat]||'✨'} ${cat}</span>
+          <span style="font-family:'DM Mono',monospace;color:var(--text3)">${entry.done} completions this week</span>
+        </div>
+        <div class="progress-bar" style="margin:0"><div class="progress-fill" style="width:${pct}%"></div></div>
+      </div>`;
+    }).join('');
+  }
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── INITIAL RENDER ───────────────────────────────────────────────────────────
+renderToday();
+</script>
+</body>
+</html>
