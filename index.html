@@ -456,6 +456,7 @@ button.btn {
 @media (max-width: 680px) {
   .today-layout    { grid-template-columns: 1fr; }
   .tabs-desktop    { display: none; }
+  .quick-analytics { display: none; }
   .bottom-nav      { display: flex; }
   .app             { padding-bottom: 90px; }
   .form-row        { grid-template-columns: 1fr; }
@@ -544,7 +545,7 @@ button.btn {
       </div>
 
       <!-- Sidebar -->
-      <div>
+      <div class="sidebar-main">
         <div class="streak-box">
           <div class="streak-emoji">🔥</div>
           <div>
@@ -552,15 +553,16 @@ button.btn {
             <div class="streak-lbl">day streak</div>
           </div>
         </div>
+          <div class="quick-analytics">
+            <div class="card" style="margin-bottom:14px">
+            <div class="section-label" style="margin-top:0">This week</div>
+            <div class="week-chart" id="mini-week-chart"></div>
+          </div>
 
-        <div class="card" style="margin-bottom:14px">
-          <div class="section-label" style="margin-top:0">This week</div>
-          <div class="week-chart" id="mini-week-chart"></div>
-        </div>
-
-        <div class="card">
-          <div class="section-label" style="margin-top:0">Quick stats</div>
-          <div id="quick-stats"></div>
+          <div class="card">
+            <div class="section-label" style="margin-top:0">Quick stats</div>
+            <div id="quick-stats"></div>
+          </div>
         </div>
       </div>
 

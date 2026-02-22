@@ -52,7 +52,7 @@ export function initToday() {
 export function render() {
   const today     = todayStr();
   const dow       = dayOfWeek(today);
-  const scheduled = getSchedules().filter(s => s.days.includes(dow)).sort((a, b) => a.time - b.time);
+  const scheduled = getSchedules().filter(s => s.days.includes(dow));
   const history   = getHistory()[today] || {};
   const adhoc     = getAdhocForDate(today);
 
@@ -99,10 +99,18 @@ function _renderScheduled(scheduled, history) {
     return;
   }
 
+  // Sort by time ascending; tasks with no time set sink to the bottom
+  const sorted = [...scheduled].sort((a, b) => {
+    if (!a.time && !b.time) return 0;
+    if (!a.time) return 1;
+    if (!b.time) return -1;
+    return a.time.localeCompare(b.time);
+  });
+
   const now    = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
 
-  el.innerHTML = scheduled.map(s => {
+  el.innerHTML = sorted.map(s => {
     const done = !!history[s.id];
     let cls  = '';
     let badge = `<span class="task-badge badge-scheduled">scheduled</span>`;
